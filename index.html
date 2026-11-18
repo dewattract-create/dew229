@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>สมุดเงินออม</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: แท็บ 3 หน้า (รายวัน / สรุปปี / เงินสะสม) ตามโครงสร้างไฟล์ monely.xlsx; ตารางกว้างเลื่อนแนวนอนในกรอบของตัวเอง */
+:root{
+  --bg:#eef2f0; --surface:#fbfdfc; --line:#d5dedb; --fg:#16231f; --muted:#5d706a;
+  --accent:#0f6b57; --accent-fg:#fff; --income:#1b7f4b; --expense:#c4452f; --saving:#2b6cb0;
+  --track:#dfe7e4; --hover:#e8f0ed; --today:#fff4d6;
+  --ui:'IBM Plex Sans Thai',system-ui,sans-serif; --num:'IBM Plex Mono',ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1a17; --surface:#16251f; --line:#27403a; --fg:#e6f0ec; --muted:#93aaa3;
+  --accent:#3fc2a0; --accent-fg:#06211a; --income:#4cc58a; --expense:#f0806a; --saving:#7db4f2;
+  --track:#223630; --hover:#1d332c; --today:#3b3414; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1a17; --surface:#16251f; --line:#27403a; --fg:#e6f0ec; --muted:#93aaa3;
+  --accent:#3fc2a0; --accent-fg:#06211a; --income:#4cc58a; --expense:#f0806a; --saving:#7db4f2;
+  --track:#223630; --hover:#1d332c; --today:#3b3414; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--ui);font-size:15px;line-height:1.5;
+  padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1120px;margin:0 auto;display:grid;gap:16px}
+h1{font-size:1.5rem;margin:0;font-weight:700}
+h2{font-size:1rem;margin:0 0 10px;font-weight:600}
+.top{display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap}
+.top p{margin:0;color:var(--muted);font-size:.9rem}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+.num{font-family:var(--num);font-variant-numeric:tabular-nums}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tabs a{padding:8px 16px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg);text-decoration:none;font-weight:500}
+.tabs a[aria-current="page"]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+.stat small{color:var(--muted);display:block}
+.stat b{font-size:1.3rem;display:block;overflow-wrap:anywhere}
+.stat.main{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.stat.main small{color:inherit;opacity:.8}
+@media (max-width:760px){.stats{grid-template-columns:1fr 1fr}}
+.btn{padding:7px 14px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg);font:inherit;font-weight:500;cursor:pointer}
+.btn.pri{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.bar b{min-width:130px;text-align:center}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{padding:0;border-bottom:1px solid var(--line);white-space:nowrap}
+th{background:var(--hover);font-weight:600;padding:8px 10px;text-align:right;position:sticky;top:0}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--surface);z-index:1}
+th:first-child{background:var(--hover);z-index:2}
+tbody tr:hover td{background:var(--hover)}
+tbody tr:hover td:first-child{background:var(--hover)}
+td.lbl{padding:6px 10px;font-weight:500}
+td.lbl small{color:var(--muted);font-weight:400;margin-left:6px}
+tr.today td{background:var(--today)}
+td.out{padding:6px 10px;text-align:right}
+td.out.calc{color:var(--muted)}
+tfoot td{font-weight:600;background:var(--hover);padding:7px 10px;text-align:right;border-bottom:0}
+tfoot td:first-child{text-align:left}
+td input{width:100%;min-width:78px;border:0;background:transparent;padding:6px 10px;text-align:right;font:inherit;font-family:var(--num);color:var(--fg)}
+td input.note{text-align:left;min-width:140px;font-family:var(--ui)}
+td input:focus{background:var(--surface);outline:2px solid var(--accent);outline-offset:-2px}
+.pos{color:var(--income)}.neg{color:var(--expense)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:6px;font-size:.85rem;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
+svg text{fill:var(--muted);font-family:var(--ui);font-size:11px}
+.hint{color:var(--muted);font-size:.85rem;margin:8px 0 0}
+details{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 16px}
+summary{cursor:pointer;font-weight:500}
+textarea{width:100%;height:120px;margin-top:10px;font-family:var(--num);font-size:.8rem;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>สมุดเงินออม</h1>
+      <p>รูปแบบเดียวกับไฟล์ monely.xlsx: ค่ากิน-อยู่รายวัน, สรุปรายรับ-รายจ่ายรายปี และเงินเก็บรวม</p>
+    </div>
+    <div class="tools"><button class="btn" id="theme" type="button">โหมดมืด/สว่าง</button></div>
+  </div>
+
+  <nav class="tabs" id="tabs">
+    <a href="#daily">ค่ากิน-อยู่รายวัน</a>
+    <a href="#summary">สรุปรายรับ-รายจ่าย</a>
+    <a href="#savings">เงินสะสม</a>
+  </nav>
+
+  <div id="view" style="display:grid;gap:16px;min-width:0"></div>
+
+  <details>
+    <summary>สำรอง / นำเข้าข้อมูล</summary>
+    <p class="hint">ข้อมูลเก็บในเบราว์เซอร์นี้เท่านั้น คัดลอกข้อความด้านล่างเก็บไว้เป็นข้อมูลสำรอง หรือวางข้อมูลเดิมแล้วกดนำเข้าเพื่อย้ายไปเครื่องอื่น</p>
+    <textarea id="backup" aria-label="ข้อมูลสำรอง"></textarea>
+    <div class="tools" style="margin-top:8px">
+      <button class="btn" id="bk-show" type="button">แสดงข้อมูลปัจจุบัน</button>
+      <button class="btn" id="bk-copy" type="button">คัดลอก</button>
+      <button class="btn pri" id="bk-import" type="button">นำเข้า</button>
+      <span id="bk-msg" class="hint" role="status"></span>
+    </div>
+  </details>
+</div>
+
+<script>
+(function(){
+  var KEY='sammud-ngoen-om-v2';
+  var MONTHS=['ม.ค','ก.พ','มี.ค','เม.ย','พ.ค','มิ.ย','ก.ค','ส.ค','ก.ย','ต.ค','พ.ย','ธ.ค'];
+  var DOW=['อา','จ','อ','พ','พฤ','ศ','ส'];
+  var CATS=[['main','ค่าหลัก'],['food','ค่ากิน'],['other','อื่นๆ'],['online','online'],['seven','เซเว่น']];
+  // เงินเก็บรวม นับเฉพาะรายการที่ counted=true (ตามสูตรในไฟล์ต้นฉบับ: ไม่นับ "เงินฝาก อ.")
+  var ASSETS=[['bkk','กรุงเทพ',1],['kbank','kbank',1],['ktb','กรุงไทย',1],['depAP','เงินฝาก อ.พ',1],['coop','หุ้นสหกร',1],['fund','กองทุน',1],['stock','หุ้น',1],['depA','เงินฝาก อ.',0],['debt','หนี้สหกร',0]];
+  var $=function(id){return document.getElementById(id)};
+  var now=new Date(), Y=now.getFullYear(), DM={y:now.getFullYear(),m:now.getMonth()};
+
+  function num(v){var n=parseFloat(v);return isNaN(n)?0:n}
+  function key(y,m){return y+'-'+String(m+1).padStart(2,'0')}
+  function fmt(n){return n.toLocaleString('th-TH',{maximumFractionDigits:2})}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+  function be(y){return y+543}
+
+  function seed(){
+    var s={daily:{},months:{},assets:{}};
+    // [เดือน, รายรับ, ค่าหลัก, ค่ากิน, อื่นๆ, online, เซเว่น, เงินสด, ฌปถ, OT]
+    var M=[[1,22421,5038,6411,13430,27290,700,1400,500,22797],[2,22797,5032,3384,8678,5418,1400,0,500,41720],
+      [3,26588,7232,6270,24079,27558,0,1400,500,0],[4,16000,5032,5139,14401,9925,1900,1000,500,3850],
+      [5,16500,4790,6989,10580,11215,2000,600,500,4775],[6,27885,4502,4877,8822,3976,1200,500,500,28863],
+      [7,13382,3703,6026,7921,27725,1200,2550,500,2000],[8,16594,3664,6337,16167,9822,1700,1500,500,29230],
+      [9,17228,3664,2418,6440,31392,1804,2000,500,3500],[10,14056,3502,3559,7196,14730,1517,0,500,17255]];
+    M.forEach(function(r){s.months[key(2026,r[0]-1)]={income:r[1],main:r[2],food:r[3],other:r[4],online:r[5],seven:r[6],cash:r[7],chpt:r[8],ot:r[9]}});
+    s.months[key(2026,10)]={income:9726,cash:0,chpt:0,ot:13381};
+    // ค่ากิน-อยู่ พ.ย. 69 (รายวัน)
+    var d={};
+    function put(day,c,v,note){d[day]=d[day]||{};if(c)d[day][c]=v;if(note)d[day].note=note}
+    put(1,'main',1000);put(1,'food',369,'-1000');put(2,'food',100);put(3,'food',170);put(4,'other',100,'-1000');
+    put(8,'main',518,'netfix');put(9,'other',1500);put(12,'other',1000);put(14,'other',2500);
+    put(18,'main',360,'youtube');put(23,'main',572,'internet');put(25,'main',152,'KGIB');put(26,'main',855,'AIS');
+    s.daily[key(2026,10)]=d;
+    // เงินเก็บรวม [เดือน, กรุงเทพ, kbank, กรุงไทย, หนี้สหกร, เงินฝาก อ., เงินฝาก อ.พ, หุ้นสหกร, กองทุน, หุ้น]
+    var A=[[2,15000,1500,2000,918533,245714,65767,186940,687100,500],[3,42405,9929,6195,911533,260714,72651,196940,701653,1000],
+      [4,19500,568,10000,904533,279714,72651,206940,702867,1500],[5,19500,500,10000,897533,296714,72651,216940,759233,0],
+      [6,3800,5000,2000,890533,295704,72651,226940,843931,2700],[7,201,3288,20976,883533,312365,72651,241940,850126,3206],
+      [8,40201,2662,21066,876533,327365,77651,256940,874162,3808],[9,40201,2662,21066,873872,0,87651,271940,872044,3808],
+      [10,20200,2700,13000,866872,253365,177651,301940,881010,3910],[11,18200,686,4320,859872,268365,191277,301940,895181,3802]];
+    A.forEach(function(r){s.assets[key(2026,r[0]-1)]={bkk:r[1],kbank:r[2],ktb:r[3],debt:r[4],depA:r[5],depAP:r[6],coop:r[7],fund:r[8],stock:r[9]}});
+    return s;
+  }
+  var state=null;
+  try{var raw=localStorage.getItem(KEY);if(raw){var p=JSON.parse(raw);if(p&&p.daily&&p.months&&p.assets)state=p}}catch(e){}
+  if(!state)state=seed();
+  var timer;
+  function save(){clearTimeout(timer);timer=setTimeout(function(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}},300)}
+
+  // ---------- คำนวณ ----------
+  function dailySums(k){
+    var d=state.daily[k];if(!d)return null;
+    var s={main:0,food:0,other:0,online:0,seven:0},any=false;
+    Object.keys(d).forEach(function(day){CATS.forEach(function(c){var v=num(d[day][c[0]]);if(v){s[c[0]]+=v;any=true}})});
+    return any?s:null;
+  }
+  function monthCalc(k){
+    var m=state.months[k]||{},ds=dailySums(k),cat={},t=0;
+    CATS.forEach(function(c){cat[c[0]]=ds?ds[c[0]]:num(m[c[0]]);t+=cat[c[0]]});
+    t+=num(m.cash)+num(m.chpt);
+    var inc=num(m.income),ot=num(m.ot);
+    return{cat:cat,total:t,income:inc,ot:ot,remain:inc-t+ot,fromDaily:!!ds,has:!!(inc||t||ot)};
+  }
+  function assetCalc(k){
+    var a=state.assets[k]||{},tot=0,has=false;
+    ASSETS.forEach(function(x){if(num(a[x[0]]))has=true;if(x[2])tot+=num(a[x[0]])});
+    var debt=num(a.debt);
+    return{total:tot,debt:debt,net:tot-debt,has:has};
+  }
+  function cls(n){return n<0?'neg':'pos'}
+
+  // ---------- กราฟ SVG ----------
+  function niceStep(x){var p=Math.pow(10,Math.floor(Math.log10(x))),n=x/p;return(n<=1?1:n<=2?2:n<=5?5:10)*p}
+  function short(v){return v>=1e6?(v/1e6).toFixed(1).replace('.0','')+' ล้าน':v>=1e3?(v/1e3)+'k':String(v)}
+  function chart(labels,series){
+    var W=720,H=240,L=58,R=14,T=12,B=26,max=1;
+    series.forEach(function(s){s.values.forEach(function(v){if(v!=null&&v>max)max=v})});
+    var step=niceStep(max/4),top=Math.ceil(max/step)*step;
+    var n=labels.length,bw=(W-L-R)/n;
+    function y(v){return T+(H-T-B)*(1-v/top)}
+    var g='';
+    for(var v=0;v<=top+0.001;v+=step){g+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y(v)+'" y2="'+y(v)+'" style="stroke:var(--line)"/><text x="'+(L-6)+'" y="'+(y(v)+4)+'" text-anchor="end">'+short(Math.round(v))+'</text>'}
+    labels.forEach(function(l,i){g+='<text x="'+(L+bw*(i+.5))+'" y="'+(H-8)+'" text-anchor="middle">'+l+'</text>'});
+    var bars=series.filter(function(s){return s.type==='bar'}),bi=0;
+    bars.forEach(function(s){
+      var w=bw*.7/bars.length;
+      s.values.forEach(function(v,i){if(!v)return;
+        var x=L+bw*i+bw*.15+bi*w;g+='<rect x="'+x+'" y="'+y(v)+'" width="'+(w-1)+'" height="'+(H-B-y(v))+'" rx="2" style="fill:'+s.color+'"><title>'+labels[i]+' '+s.name+' '+fmt(v)+'</title></rect>'});
+      bi++;
+    });
+    series.filter(function(s){return s.type==='line'}).forEach(function(s){
+      var pts=[],last=null;
+      s.values.forEach(function(v,i){if(v==null||!v)return;var x=L+bw*(i+.5);pts.push(x+','+y(v));last=[x,y(v),v]});
+      if(pts.length>1)g+='<polyline points="'+pts.join(' ')+'" fill="none" stroke-width="2.5" style="stroke:'+s.color+'"/>';
+      s.values.forEach(function(v,i){if(!v)return;g+='<circle cx="'+(L+bw*(i+.5))+'" cy="'+y(v)+'" r="3.5" style="fill:'+s.color+'"><title>'+labels[i]+' '+s.name+' '+fmt(v)+'</title></circle>'});
+    });
+    var lg='<div class="legend">'+series.map(function(s){return '<span><i style="background:'+s.color+'"></i>'+s.name+'</span>'}).join('')+'</div>';
+    return lg+'<div class="scroll" style="border:0"><svg viewBox="0 0 '+W+' '+H+'" style="min-width:600px;width:100%;display:block" role="img" aria-label="กราฟ">'+g+'</svg></div>';
+  }
+
+  // ---------- หน้ารายวัน ----------
+  function viewDaily(){
+    var k=key(DM.y,DM.m),days=new Date(DM.y,DM.m+1,0).getDate(),d=state.daily[k]||{};
+    var today=(DM.y===now.getFullYear()&&DM.m===now.getMonth())?now.getDate():0;
+    var rows='';
+    for(var i=1;i<=days;i++){
+      var r=d[i]||{};
+      rows+='<tr'+(i===today?' class="today"':'')+'><td class="lbl">'+i+'<small>'+DOW[new Date(DM.y,DM.m,i).getDay()]+'</small></td>'+
+        CATS.map(function(c){return '<td><input type="number" step="any" inputmode="decimal" data-d="'+i+'" data-c="'+c[0]+'" aria-label="'+c[1]+' วันที่ '+i+'" value="'+esc(r[c[0]])+'"></td>'}).join('')+
+        '<td><input class="note" type="text" data-d="'+i+'" data-c="note" aria-label="หมายเหตุ วันที่ '+i+'" value="'+esc(r.note)+'"></td></tr>';
+    }
+    $('view').innerHTML=
+      '<div class="stats" id="dstats"></div>'+
+      '<div class="card"><div class="bar"><button class="btn" data-nav="-1" type="button" aria-label="เดือนก่อนหน้า">‹</button><b>'+MONTHS[DM.m]+' '+be(DM.y)+'</b><button class="btn" data-nav="1" type="button" aria-label="เดือนถัดไป">›</button></div>'+
+      '<div class="scroll" style="max-height:70vh"><table><thead><tr><th>วัน</th>'+CATS.map(function(c){return '<th>'+c[1]+'</th>'}).join('')+'<th style="text-align:left">หมายเหตุ</th></tr></thead><tbody>'+rows+'</tbody>'+
+      '<tfoot><tr><td>รวม</td>'+CATS.map(function(c){return '<td class="num" data-sum="'+c[0]+'"></td>'}).join('')+'<td></td></tr></tfoot></table></div>'+
+      '<p class="hint">กรอกเป็นตัวเลข ระบบบันทึกอัตโนมัติ ยอดรวมของเดือนที่มีข้อมูลรายวันจะไปแทนที่ยอดในหน้าสรุป</p></div>';
+    calcDaily();
+  }
+  function calcDaily(){
+    var k=key(DM.y,DM.m),s=dailySums(k)||{main:0,food:0,other:0,online:0,seven:0},t=0;
+    CATS.forEach(function(c){t+=s[c[0]];var el=document.querySelector('[data-sum="'+c[0]+'"]');if(el)el.textContent=fmt(s[c[0]])});
+    var mc=monthCalc(k),food=s.food;
+    var days=new Date(DM.y,DM.m+1,0).getDate();
+    var el=$('dstats');if(!el)return;
+    el.innerHTML='<div class="stat main"><small>รวมรายวันเดือนนี้</small><b class="num">฿'+fmt(t)+'</b></div>'+
+      '<div class="stat"><small>ค่ากิน</small><b class="num">฿'+fmt(food)+'</b></div>'+
+      '<div class="stat"><small>เฉลี่ยต่อวัน</small><b class="num">฿'+fmt(Math.round(t/(DM.y===now.getFullYear()&&DM.m===now.getMonth()?now.getDate():days)))+'</b></div>'+
+      '<div class="stat"><small>จ่ายรวมเดือนนี้ (รวมเงินสด/ฌปถ)</small><b class="num">฿'+fmt(mc.total)+'</b></div>';
+  }
+
+  // ---------- หน้าสรุป ----------
+  function viewSummary(){
+    var rows='';
+    for(var m=0;m<12;m++){
+      var k=key(Y,m),mo=state.months[k]||{},c=monthCalc(k);
+      function cell(f,calc){return '<td><input type="number" step="any" inputmode="decimal" data-m="'+f+'" data-ym="'+k+'" aria-label="'+f+' '+MONTHS[m]+'" value="'+esc(mo[f])+'"></td>'}
+      rows+='<tr><td class="lbl">'+MONTHS[m]+(c.fromDaily?'<small>รายวัน</small>':'')+'</td>'+cell('income')+
+        CATS.map(function(x){return c.fromDaily?'<td class="out calc num" title="รวมจากหน้ารายวัน">'+fmt(c.cat[x[0]])+'</td>':cell(x[0])}).join('')+
+        cell('cash')+cell('chpt')+'<td class="out num" data-out="total" data-ym="'+k+'"></td>'+cell('ot')+'<td class="out num" data-out="remain" data-ym="'+k+'"></td></tr>';
+    }
+    $('view').innerHTML='<div class="stats" id="sstats"></div>'+
+      '<div class="card"><h2>รายรับ-รายจ่าย '+yearNav()+'</h2><div class="scroll"><table><thead><tr><th>เดือน</th><th>รายรับ</th>'+CATS.map(function(x){return '<th>'+x[1]+'</th>'}).join('')+'<th>เงินสด</th><th>ฌปถ</th><th>จ่ายรวม</th><th>OT</th><th>คงเหลือ</th></tr></thead><tbody>'+rows+'</tbody>'+
+      '<tfoot><tr><td>รวมปี</td><td data-ft="income"></td>'+CATS.map(function(x){return '<td data-ft="'+x[0]+'"></td>'}).join('')+'<td data-ft="cash"></td><td data-ft="chpt"></td><td data-ft="total"></td><td data-ft="ot"></td><td data-ft="remain"></td></tr></tfoot></table></div>'+
+      '<p class="hint">คงเหลือ = รายรับ − จ่ายรวม + OT (สูตรเดียวกับไฟล์ต้นฉบับ) เดือนที่มีข้อมูลรายวันจะคำนวณหมวดจากหน้ารายวันให้อัตโนมัติ</p></div>'+
+      '<div class="card"><h2>รายรับเทียบรายจ่ายรายเดือน</h2><div id="schart"></div></div>';
+    calcSummary();
+  }
+  function yearNav(){return '<span class="bar" style="display:inline-flex;margin:0 0 0 8px;vertical-align:middle"><button class="btn" data-ynav="-1" type="button" aria-label="ปีก่อนหน้า">‹</button><b style="min-width:70px">'+be(Y)+'</b><button class="btn" data-ynav="1" type="button" aria-label="ปีถัดไป">›</button></span>'}
+  function calcSummary(){
+    var tot={income:0,cash:0,chpt:0,total:0,ot:0,remain:0};CATS.forEach(function(c){tot[c[0]]=0});
+    var inc=[],exp=[],used=0,maxM=null,maxV=0;
+    for(var m=0;m<12;m++){
+      var k=key(Y,m),c=monthCalc(k),mo=state.months[k]||{};
+      var t=document.querySelector('[data-out="total"][data-ym="'+k+'"]'),r=document.querySelector('[data-out="remain"][data-ym="'+k+'"]');
+      if(t)t.textContent=c.has?fmt(c.total):'';
+      if(r){r.textContent=c.has?fmt(c.remain):'';r.className='out num '+(c.has?cls(c.remain):'')}
+      tot.income+=c.income;tot.total+=c.total;tot.ot+=c.ot;tot.remain+=c.has?c.remain:0;tot.cash+=num(mo.cash);tot.chpt+=num(mo.chpt);
+      CATS.forEach(function(x){tot[x[0]]+=c.cat[x[0]]});
+      inc.push(c.income||null);exp.push(c.total||null);
+      if(c.total){used++;if(c.total>maxV){maxV=c.total;maxM=m}}
+    }
+    document.querySelectorAll('[data-ft]').forEach(function(el){var f=el.dataset.ft;el.textContent=fmt(tot[f]);if(f==='remain')el.className=cls(tot[f])});
+    var el=$('sstats');if(el)el.innerHTML=
+      '<div class="stat main"><small>จ่ายรวมทั้งปี</small><b class="num">฿'+fmt(tot.total)+'</b></div>'+
+      '<div class="stat"><small>รายรับรวม</small><b class="num pos">฿'+fmt(tot.income)+'</b></div>'+
+      '<div class="stat"><small>เฉลี่ยจ่ายต่อเดือน</small><b class="num">฿'+fmt(used?Math.round(tot.total/used):0)+'</b></div>'+
+      '<div class="stat"><small>เดือนที่จ่ายสูงสุด</small><b class="num">'+(maxM==null?'-':MONTHS[maxM]+' ฿'+fmt(maxV))+'</b></div>';
+    var ch=$('schart');if(ch)ch.innerHTML=chart(MONTHS,[{name:'รายรับ',color:'var(--income)',type:'bar',values:inc},{name:'จ่ายรวม',color:'var(--expense)',type:'bar',values:exp}]);
+  }
+
+  // ---------- หน้าเงินสะสม ----------
+  function viewSavings(){
+    var rows='';
+    for(var m=0;m<12;m++){
+      var k=key(Y,m),a=state.assets[k]||{};
+      rows+='<tr><td class="lbl">'+MONTHS[m]+'</td>'+ASSETS.map(function(x){
+        return '<td><input type="number" step="any" inputmode="decimal" data-a="'+x[0]+'" data-ym="'+k+'" aria-label="'+x[1]+' '+MONTHS[m]+'" value="'+esc(a[x[0]])+'"></td>'}).join('')+
+        '<td class="out num" data-aout="total" data-ym="'+k+'"></td><td class="out num" data-aout="net" data-ym="'+k+'"></td></tr>';
+    }
+    $('view').innerHTML='<div class="stats" id="astats"></div>'+
+      '<div class="card"><h2>เงินสะสม '+yearNav()+'</h2><div id="achart"></div></div>'+
+      '<div class="card"><h2>บัญชีและสินทรัพย์รายเดือน</h2><div class="scroll"><table><thead><tr><th>เดือน</th>'+ASSETS.map(function(x){return '<th>'+x[1]+'</th>'}).join('')+'<th>เงินเก็บรวม</th><th>ลบหนี้</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+      '<p class="hint">เงินเก็บรวม = กรุงเทพ + kbank + กรุงไทย + เงินฝาก อ.พ + หุ้นสหกร + กองทุน + หุ้น (ไม่นับ "เงินฝาก อ." ตามไฟล์ต้นฉบับ) · ลบหนี้ = เงินเก็บรวม − หนี้สหกร</p></div>';
+    calcSavings();
+  }
+  function calcSavings(){
+    var tots=[],debts=[],last=null,first=null;
+    for(var m=0;m<12;m++){
+      var k=key(Y,m),c=assetCalc(k);
+      var t=document.querySelector('[data-aout="total"][data-ym="'+k+'"]'),n=document.querySelector('[data-aout="net"][data-ym="'+k+'"]');
+      if(t)t.textContent=c.has?fmt(c.total):'';
+      if(n){n.textContent=c.has?fmt(c.net):'';n.className='out num '+(c.has?cls(c.net):'')}
+      tots.push(c.has?c.total:null);debts.push(c.has&&c.debt?c.debt:null);
+      if(c.has){last=c;if(!first)first=c}
+    }
+    var el=$('astats');
+    if(el)el.innerHTML=last?
+      '<div class="stat main"><small>เงินเก็บรวมล่าสุด</small><b class="num">฿'+fmt(last.total)+'</b></div>'+
+      '<div class="stat"><small>หนี้สหกร</small><b class="num neg">฿'+fmt(last.debt)+'</b></div>'+
+      '<div class="stat"><small>ลบหนี้</small><b class="num '+cls(last.net)+'">฿'+fmt(last.net)+'</b></div>'+
+      '<div class="stat"><small>เพิ่มขึ้นจากเดือนแรกที่บันทึก</small><b class="num '+cls(last.total-first.total)+'">฿'+fmt(last.total-first.total)+'</b></div>'
+      :'<div class="stat main" style="grid-column:1/-1"><small>ยังไม่มีข้อมูลปีนี้</small><b>กรอกยอดบัญชีในตารางด้านล่างเพื่อเริ่มติดตามเงินสะสม</b></div>';
+    var ch=$('achart');if(ch)ch.innerHTML=chart(MONTHS,[{name:'เงินเก็บรวม',color:'var(--saving)',type:'line',values:tots},{name:'หนี้สหกร',color:'var(--expense)',type:'line',values:debts}]);
+  }
+
+  // ---------- ควบคุม ----------
+  var VIEWS={daily:viewDaily,summary:viewSummary,savings:viewSavings};
+  function route(){
+    var h=(location.hash||'#daily').slice(1);if(!VIEWS[h])h='daily';
+    document.querySelectorAll('#tabs a').forEach(function(a){if(a.getAttribute('href')==='#'+h)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
+    VIEWS[h]();
+  }
+  window.addEventListener('hashchange',route);
+
+  document.addEventListener('input',function(e){
+    var t=e.target,d=t.dataset;
+    if(d.d){var k=key(DM.y,DM.m);state.daily[k]=state.daily[k]||{};state.daily[k][d.d]=state.daily[k][d.d]||{};state.daily[k][d.d][d.c]=t.value;calcDaily();save()}
+    else if(d.m){state.months[d.ym]=state.months[d.ym]||{};state.months[d.ym][d.m]=t.value;calcSummary();save()}
+    else if(d.a){state.assets[d.ym]=state.assets[d.ym]||{};state.assets[d.ym][d.a]=t.value;calcSavings();save()}
+  });
+  document.addEventListener('click',function(e){
+    var n=e.target.closest('[data-nav]'),y=e.target.closest('[data-ynav]');
+    if(n){var d=new Date(DM.y,DM.m+ +n.dataset.nav,1);DM={y:d.getFullYear(),m:d.getMonth()};viewDaily()}
+    if(y){Y+= +y.dataset.ynav;route()}
+  });
+  $('theme').addEventListener('click',function(){
+    var r=document.documentElement,dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme:dark)').matches;
+    r.dataset.theme=dark?'light':'dark';
+  });
+  function msg(t){$('bk-msg').textContent=t}
+  $('bk-show').addEventListener('click',function(){$('backup').value=JSON.stringify(state);msg('')});
+  $('bk-copy').addEventListener('click',function(){
+    var ta=$('backup');if(!ta.value)ta.value=JSON.stringify(state);ta.select();
+    (navigator.clipboard?navigator.clipboard.writeText(ta.value):Promise.reject()).then(function(){msg('คัดลอกแล้ว')},function(){msg('เลือกข้อความไว้แล้ว กดคัดลอกด้วยตัวเอง')});
+  });
+  $('bk-import').addEventListener('click',function(){
+    try{var p=JSON.parse($('backup').value);if(!(p&&p.daily&&p.months&&p.assets))throw 0;
+      state=p;save();route();msg('นำเข้าข้อมูลแล้ว')}catch(e){msg('ข้อมูลไม่ถูกต้อง ตรวจสอบข้อความที่วาง')}
+  });
+  route();
+})();
+</script>
+</body>
+</html>
