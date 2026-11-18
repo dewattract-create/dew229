@@ -78,7 +78,16 @@ textarea{width:100%;height:120px;margin-top:10px;font-family:var(--num);font-siz
 
 </head>
 <body>
-<div class="wrap">
+<div id="gate" style="max-width:360px;margin:12vh auto 0">
+  <form id="gate-form" class="card" style="display:grid;gap:12px">
+    <h1>สมุดเงินออม</h1>
+    <p style="margin:0;color:var(--muted)">กรอกรหัสผ่านเพื่อเข้าดูข้อมูล</p>
+    <input id="gate-pw" type="password" autocomplete="current-password" aria-label="รหัสผ่าน" required style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font:inherit">
+    <button class="btn pri" type="submit">เข้าสู่ระบบ</button>
+    <span id="gate-msg" class="hint" role="status"></span>
+  </form>
+</div>
+<div class="wrap" id="app" style="display:none">
   <div class="top">
     <div>
       <h1>สมุดเงินออม</h1>
@@ -109,7 +118,7 @@ textarea{width:100%;height:120px;margin-top:10px;font-family:var(--num);font-siz
 </div>
 
 <script>
-(function(){
+function boot(SEEDDATA){
   var KEY='sammud-ngoen-om-v2';
   var MONTHS=['ม.ค','ก.พ','มี.ค','เม.ย','พ.ค','มิ.ย','ก.ค','ส.ค','ก.ย','ต.ค','พ.ย','ธ.ค'];
   var DOW=['อา','จ','อ','พ','พฤ','ศ','ส'];
@@ -125,32 +134,7 @@ textarea{width:100%;height:120px;margin-top:10px;font-family:var(--num);font-siz
   function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
   function be(y){return y+543}
 
-  function seed(){
-    var s={daily:{},months:{},assets:{}};
-    // [เดือน, รายรับ, ค่าหลัก, ค่ากิน, อื่นๆ, online, เซเว่น, เงินสด, ฌปถ, OT]
-    var M=[[1,22421,5038,6411,13430,27290,700,1400,500,22797],[2,22797,5032,3384,8678,5418,1400,0,500,41720],
-      [3,26588,7232,6270,24079,27558,0,1400,500,0],[4,16000,5032,5139,14401,9925,1900,1000,500,3850],
-      [5,16500,4790,6989,10580,11215,2000,600,500,4775],[6,27885,4502,4877,8822,3976,1200,500,500,28863],
-      [7,13382,3703,6026,7921,27725,1200,2550,500,2000],[8,16594,3664,6337,16167,9822,1700,1500,500,29230],
-      [9,17228,3664,2418,6440,31392,1804,2000,500,3500],[10,14056,3502,3559,7196,14730,1517,0,500,17255]];
-    M.forEach(function(r){s.months[key(2026,r[0]-1)]={income:r[1],main:r[2],food:r[3],other:r[4],online:r[5],seven:r[6],cash:r[7],chpt:r[8],ot:r[9]}});
-    s.months[key(2026,10)]={income:9726,cash:0,chpt:0,ot:13381};
-    // ค่ากิน-อยู่ พ.ย. 69 (รายวัน)
-    var d={};
-    function put(day,c,v,note){d[day]=d[day]||{};if(c)d[day][c]=v;if(note)d[day].note=note}
-    put(1,'main',1000);put(1,'food',369,'-1000');put(2,'food',100);put(3,'food',170);put(4,'other',100,'-1000');
-    put(8,'main',518,'netfix');put(9,'other',1500);put(12,'other',1000);put(14,'other',2500);
-    put(18,'main',360,'youtube');put(23,'main',572,'internet');put(25,'main',152,'KGIB');put(26,'main',855,'AIS');
-    s.daily[key(2026,10)]=d;
-    // เงินเก็บรวม [เดือน, กรุงเทพ, kbank, กรุงไทย, หนี้สหกร, เงินฝาก อ., เงินฝาก อ.พ, หุ้นสหกร, กองทุน, หุ้น]
-    var A=[[2,15000,1500,2000,918533,245714,65767,186940,687100,500],[3,42405,9929,6195,911533,260714,72651,196940,701653,1000],
-      [4,19500,568,10000,904533,279714,72651,206940,702867,1500],[5,19500,500,10000,897533,296714,72651,216940,759233,0],
-      [6,3800,5000,2000,890533,295704,72651,226940,843931,2700],[7,201,3288,20976,883533,312365,72651,241940,850126,3206],
-      [8,40201,2662,21066,876533,327365,77651,256940,874162,3808],[9,40201,2662,21066,873872,0,87651,271940,872044,3808],
-      [10,20200,2700,13000,866872,253365,177651,301940,881010,3910],[11,18200,686,4320,859872,268365,191277,301940,895181,3802]];
-    A.forEach(function(r){s.assets[key(2026,r[0]-1)]={bkk:r[1],kbank:r[2],ktb:r[3],debt:r[4],depA:r[5],depAP:r[6],coop:r[7],fund:r[8],stock:r[9]}});
-    return s;
-  }
+  function seed(){return SEEDDATA||{daily:{},months:{},assets:{}}}
   var state=null;
   try{var raw=localStorage.getItem(KEY);if(raw){var p=JSON.parse(raw);if(p&&p.daily&&p.months&&p.assets)state=p}}catch(e){}
   if(!state)state=seed();
@@ -349,7 +333,32 @@ textarea{width:100%;height:120px;margin-top:10px;font-family:var(--num);font-siz
       state=p;save();route();msg('นำเข้าข้อมูลแล้ว')}catch(e){msg('ข้อมูลไม่ถูกต้อง ตรวจสอบข้อความที่วาง')}
   });
   route();
-})();
+}
+
+var ENC={"s": "lahU6CYVUeEjUW6BPDOVWg==", "i": "RTAnCzR2hYyJKjUl", "c": "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", "n": 310000};
+function b64(x){return Uint8Array.from(atob(x),function(c){return c.charCodeAt(0)})}
+async function unlock(pw){
+  var km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
+  var k=await crypto.subtle.deriveKey({name:'PBKDF2',salt:b64(ENC.s),iterations:ENC.n,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['decrypt']);
+  var pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(ENC.i)},k,b64(ENC.c));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+var booted=false;
+async function tryPw(pw,msg){
+  try{
+    var data=await unlock(pw);
+    if(booted)return;booted=true;
+    try{sessionStorage.setItem('gate-pw',pw)}catch(e){}
+    document.getElementById('gate').style.display='none';
+    document.getElementById('app').style.display='';
+    boot(data);
+  }catch(e){ if(msg){msg.textContent='รหัสผ่านไม่ถูกต้อง'} }
+}
+document.getElementById('gate-form').addEventListener('submit',function(e){
+  e.preventDefault();var m=document.getElementById('gate-msg');m.textContent='กำลังตรวจสอบ...';
+  tryPw(document.getElementById('gate-pw').value,m);
+});
+try{var sp=sessionStorage.getItem('gate-pw');if(sp)tryPw(sp)}catch(e){}
 </script>
 </body>
 </html>
